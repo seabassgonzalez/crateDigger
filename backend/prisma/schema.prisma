@@ -1,0 +1,277 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String         @id @default(cuid())
+  email             String         @unique
+  username          String         @unique
+  password          String
+  firstName         String?
+  lastName          String?
+  avatar            String?
+  bio               String?
+  isActive          Boolean        @default(true)
+  emailVerified     Boolean        @default(false)
+  role              UserRole       @default(USER)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  refreshTokens     RefreshToken[]
+  collection        Collection?
+  wantlist          Wantlist?
+
+  @@index([email])
+  @@index([username])
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+model Artist {
+  id          String            @id @default(cuid())
+  name        String
+  realName    String?
+  profile     String?           @db.Text
+  images      Image[]
+  releases    ReleaseArtist[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([name])
+}
+
+model Label {
+  id          String     @id @default(cuid())
+  name        String
+  profile     String?    @db.Text
+  contactInfo String?
+  images      Image[]
+  releases    Release[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([name])
+}
+
+model Release {
+  id               String            @id @default(cuid())
+  title            String
+  artists          ReleaseArtist[]
+  labelId          String?
+  label            Label?            @relation(fields: [labelId], references: [id])
+  catalogNumber    String?
+  formatId         String
+  format           Format            @relation(fields: [formatId], references: [id])
+  countryId        String?
+  country          Country?          @relation(fields: [countryId], references: [id])
+  released         DateTime?
+  releaseDate      String?           // For partial dates like "1995" or "March 1995"
+  notes            String?           @db.Text
+  images           Image[]
+  tracks           Track[]
+  genres           ReleaseGenre[]
+  styles           ReleaseStyle[]
+  collectionItems  CollectionItem[]
+  wantlistItems    WantlistItem[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([title])
+  @@index([catalogNumber])
+}
+
+model ReleaseArtist {
+  id         String   @id @default(cuid())
+  releaseId  String
+  release    Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  artistId   String
+  artist     Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  anv        String?  // Artist name variation (as credited)
+  join       String?  // Join string (e.g., "&", "feat.", "vs.")
+  role       String?  // Role in the release
+  position   Int      // Order position
+
+  @@unique([releaseId, artistId, position])
+  @@index([releaseId])
+  @@index([artistId])
+}
+
+model Track {
+  id         String   @id @default(cuid())
+  releaseId  String
+  release    Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  position   String   // e.g., "A1", "B2", "1", "2-1"
+  title      String
+  duration   String?  // e.g., "5:23"
+  
+  @@index([releaseId])
+}
+
+model Genre {
+  id        String          @id @default(cuid())
+  name      String          @unique
+  releases  ReleaseGenre[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model Style {
+  id        String          @id @default(cuid())
+  name      String          @unique
+  releases  ReleaseStyle[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model ReleaseGenre {
+  id        String   @id @default(cuid())
+  releaseId String
+  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  genreId   String
+  genre     Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@unique([releaseId, genreId])
+  @@index([releaseId])
+  @@index([genreId])
+}
+
+model ReleaseStyle {
+  id        String   @id @default(cuid())
+  releaseId String
+  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  styleId   String
+  style     Style    @relation(fields: [styleId], references: [id], onDelete: Cascade)
+
+  @@unique([releaseId, styleId])
+  @@index([releaseId])
+  @@index([styleId])
+}
+
+model Format {
+  id          String     @id @default(cuid())
+  name        String     @unique // e.g., "Vinyl", "CD", "Cassette"
+  description String?
+  releases    Release[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Country {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  code      String     @unique // ISO country code
+  releases  Release[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Collection {
+  id         String           @id @default(cuid())
+  userId     String           @unique
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      CollectionItem[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([userId])
+}
+
+model CollectionItem {
+  id           String          @id @default(cuid())
+  collectionId String
+  collection   Collection      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  releaseId    String
+  release      Release         @relation(fields: [releaseId], references: [id])
+  condition    ItemCondition   @default(GOOD)
+  notes        String?
+  rating       Int?            // 1-5 rating
+  addedAt      DateTime        @default(now())
+  
+  @@unique([collectionId, releaseId])
+  @@index([collectionId])
+  @@index([releaseId])
+}
+
+model Wantlist {
+  id        String         @id @default(cuid())
+  userId    String         @unique
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     WantlistItem[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([userId])
+}
+
+model WantlistItem {
+  id          String   @id @default(cuid())
+  wantlistId  String
+  wantlist    Wantlist @relation(fields: [wantlistId], references: [id], onDelete: Cascade)
+  releaseId   String
+  release     Release  @relation(fields: [releaseId], references: [id])
+  notes       String?
+  addedAt     DateTime @default(now())
+  
+  @@unique([wantlistId, releaseId])
+  @@index([wantlistId])
+  @@index([releaseId])
+}
+
+model Image {
+  id        String    @id @default(cuid())
+  url       String
+  type      ImageType
+  artistId  String?
+  artist    Artist?   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  releaseId String?
+  release   Release?  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  labelId   String?
+  label     Label?    @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  width     Int?
+  height    Int?
+  createdAt DateTime  @default(now())
+
+  @@index([artistId])
+  @@index([releaseId])
+  @@index([labelId])
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum ItemCondition {
+  MINT
+  NEAR_MINT
+  VERY_GOOD_PLUS
+  VERY_GOOD
+  GOOD_PLUS
+  GOOD
+  FAIR
+  POOR
+}
+
+enum ImageType {
+  PRIMARY
+  SECONDARY
+}
